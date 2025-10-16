@@ -81,30 +81,28 @@ def parse_qa_from_text(text):
 
 if uploaded_file:
     st.write(f"📄 Fichier : {uploaded_file.name}")
+    from utils.document_loader import extract_qa_pairs_from_pdf
+
+# ...
+
+if uploaded_file and uploaded_file.name.endswith(".pdf"):
     if st.button("Extraire et entraîner"):
-        with st.spinner("Extraction et analyse en cours..."):
-            text = extract_text_from_file(uploaded_file)
-            if not text.strip():
-                st.error("❌ Aucun texte extrait du fichier.")
-            else:
-                # Parser les paires Q/R
-                pairs = parse_qa_from_text(text)
+        with st.spinner("Analyse du PDF..."):
+            try:
+                uploaded_file.seek(0)
+                pairs = extract_qa_pairs_from_pdf(uploaded_file)
                 if pairs:
-                    # Ajouter chaque paire manuellement
                     for q, r in pairs:
                         add_manual_pair(q, r)
-                    st.success(f"✅ {len(pairs)} paires ajoutées à la mémoire de Zia !")
-                    # Sauvegarder le fichier source
+                    st.success(f"✅ {len(pairs)} paires ajoutées !")
+                    # Sauvegarder le PDF
                     with open(os.path.join(DOC_FOLDER, uploaded_file.name), "wb") as f:
                         uploaded_file.seek(0)
                         f.write(uploaded_file.getbuffer())
-                    
-                    # Optionnel : afficher un aperçu
-                    with st.expander("👁️ Aperçu des paires extraites"):
-                        preview_df = pd.DataFrame(pairs[:10], columns=["Question", "Réponse"])
-                        st.dataframe(preview_df, use_container_width=True, hide_index=True)
                 else:
-                    st.error("❌ Impossible de détecter des paires question/réponse dans le document.")
+                    st.error("❌ Aucune paire trouvée.")
+            except Exception as e:
+                st.error(f"Erreur : {e}")
 
 # --- Section 3 : Questions non résolues ---
 st.subheader("❓ Questions en attente d’apprentissage")
