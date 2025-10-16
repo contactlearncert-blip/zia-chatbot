@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import csv
 from utils.chat_engine import add_manual_pair, load_unanswered_questions, mark_as_answered
-from utils.document_loader import extract_text_from_file
+from utils.document_loader import extract_qa_pairs_from_pdf
 
 ADMIN_PASSWORD = "zia2025"
 DATA_FILE = "data/conversations.csv"
