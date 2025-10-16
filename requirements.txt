@@ -3,3 +3,5 @@ pandas
 scikit-learn
 numpy
 pdfplumber
+sentence-transformers>=2.2.0
+torch>=1.13.0  # nécessaire pour sentence-transformers
