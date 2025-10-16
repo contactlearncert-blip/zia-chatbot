@@ -1,0 +1,134 @@
+# pages/2_admin.py
+import streamlit as st
+import pandas as pd
+import os
+import csv
+from utils.chat_engine import add_manual_pair, load_unanswered_questions, mark_as_answered
+from utils.document_loader import extract_text_from_file
+
+ADMIN_PASSWORD = "zia2025"
+DATA_FILE = "data/conversations.csv"
+UNANSWERED_FILE = "data/unanswered_questions.csv"
+DOC_FOLDER = "data/documents"
+
+os.makedirs("data", exist_ok=True)
+os.makedirs(DOC_FOLDER, exist_ok=True)
+
+st.set_page_config(page_title="⚙️ Admin - Zia", page_icon="🛠️")
+st.title("⚙️ Admin - Entraîner Zia")
+
+# --- Authentification ---
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+if not st.session_state.admin_logged_in:
+    st.subheader("Mot de passe requis")
+    pwd = st.text_input("Mot de passe", type="password")
+    if st.button("Se connecter"):
+        if pwd == ADMIN_PASSWORD:
+            st.session_state.admin_logged_in = True
+            st.rerun()
+        else:
+            st.error("Mot de passe incorrect.")
+    st.stop()
+
+# --- Déconnexion ---
+if st.button("🔒 Déconnexion"):
+    st.session_state.admin_logged_in = False
+    st.rerun()
+
+# --- Section 1 : Ajout manuel ---
+st.subheader("➕ Ajouter une paire Q/R")
+col1, col2 = st.columns(2)
+with col1:
+    q = st.text_input("Question")
+with col2:
+    r = st.text_input("Réponse")
+
+if st.button("✅ Ajouter"):
+    if q and r:
+        add_manual_pair(q, r)
+        st.success("✅ Ajouté !")
+    else:
+        st.error("Remplis les deux champs.")
+
+# --- Section 2 : Charger un document ---
+st.subheader("📄 Charger un document (PDF, TXT)")
+uploaded_file = st.file_uploader("Choisis un fichier", type=["pdf", "txt"])
+
+def parse_qa_from_text(text):
+    """Parse un texte brut contenant des lignes alternées : Question / Réponse"""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    pairs = []
+    i = 0
+    while i < len(lines):
+        # Ignorer les séparateurs
+        if lines[i] in ["|", "---", "Question", "Réponse", "||", "| ---|---|"]:
+            i += 1
+            continue
+        question = lines[i]
+        if i + 1 < len(lines):
+            response = lines[i + 1]
+            # Nettoyer les artefacts
+            question = question.replace("|", "").strip()
+            response = response.replace("|", "").strip()
+            if question and response:
+                pairs.append((question, response))
+            i += 2
+        else:
+            break
+    return pairs
+
+if uploaded_file:
+    st.write(f"📄 Fichier : {uploaded_file.name}")
+    if st.button("Extraire et entraîner"):
+        with st.spinner("Extraction et analyse en cours..."):
+            text = extract_text_from_file(uploaded_file)
+            if not text.strip():
+                st.error("❌ Aucun texte extrait du fichier.")
+            else:
+                # Parser les paires Q/R
+                pairs = parse_qa_from_text(text)
+                if pairs:
+                    # Ajouter chaque paire manuellement
+                    for q, r in pairs:
+                        add_manual_pair(q, r)
+                    st.success(f"✅ {len(pairs)} paires ajoutées à la mémoire de Zia !")
+                    # Sauvegarder le fichier source
+                    with open(os.path.join(DOC_FOLDER, uploaded_file.name), "wb") as f:
+                        uploaded_file.seek(0)
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Optionnel : afficher un aperçu
+                    with st.expander("👁️ Aperçu des paires extraites"):
+                        preview_df = pd.DataFrame(pairs[:10], columns=["Question", "Réponse"])
+                        st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                else:
+                    st.error("❌ Impossible de détecter des paires question/réponse dans le document.")
+
+# --- Section 3 : Questions non résolues ---
+st.subheader("❓ Questions en attente d’apprentissage")
+unanswered = load_unanswered_questions()
+
+if unanswered.empty:
+    st.info("Aucune question en attente.")
+else:
+    for idx, row in unanswered.iterrows():
+        q = row["question"]
+        st.write(f"**❓ {q}**")
+        answer = st.text_input(f"Réponse pour : {q}", key=f"ans_{idx}")
+        if st.button("✅ Enseigner", key=f"btn_{idx}"):
+            if answer.strip():
+                add_manual_pair(q, answer)
+                mark_as_answered(q)
+                st.success("Zia a appris !")
+                st.rerun()
+    st.caption(f"Total : {len(unanswered)} questions non résolues.")
+
+# --- Voir toutes les paires connues ---
+if st.checkbox("👁️ Voir toutes les paires connues"):
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE, quoting=csv.QUOTE_ALL, encoding="utf-8")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Aucune donnée.")
