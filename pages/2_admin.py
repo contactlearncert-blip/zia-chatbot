@@ -31,7 +31,12 @@ if not st.session_state.admin_logged_in:
         else:
             st.error("Mot de passe incorrect.")
     st.stop()
-
+# Dans pages/2_admin.py, section admin
+if st.button("🗑️ Réinitialiser toutes les données"):
+    pd.DataFrame(columns=["question", "reponse"]).to_csv(DATA_FILE, index=False, quoting=csv.QUOTE_ALL)
+    pd.DataFrame(columns=["question"]).to_csv(UNANSWERED_FILE, index=False, quoting=csv.QUOTE_ALL)
+    st.success("✅ Toutes les données ont été effacées.")
+    st.rerun()
 # --- Déconnexion ---
 if st.button("🔒 Déconnexion"):
     st.session_state.admin_logged_in = False
