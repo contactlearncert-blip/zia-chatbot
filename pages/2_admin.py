@@ -89,6 +89,25 @@ if uploaded_file:
     from utils.document_loader import extract_qa_pairs_from_pdf
 
 # ...
+st.subheader("📥 Charger un fichier JSON (recommandé)")
+json_file = st.file_uploader("Choisis un fichier JSON", type=["json"])
+
+if json_file:
+    st.write(f"📄 Fichier : {json_file.name}")
+    if st.button("Charger les connaissances (JSON)"):
+        with st.spinner("Chargement des paires Q/R..."):
+            try:
+                # Sauvegarder temporairement
+                temp_path = os.path.join(DOC_FOLDER, json_file.name)
+                with open(temp_path, "wb") as f:
+                    f.write(json_file.getbuffer())
+                
+                # Charger
+                from utils.knowledge_loader import load_knowledge_from_json
+                count = load_knowledge_from_json(temp_path)
+                st.success(f"✅ {count} paires ajoutées depuis le JSON !")
+            except Exception as e:
+                st.error(f"❌ Erreur : {e}")
 
 if uploaded_file and uploaded_file.name.endswith(".pdf"):
     if st.button("Extraire et entraîner"):
